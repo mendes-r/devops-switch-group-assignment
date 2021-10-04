@@ -1,0 +1,44 @@
+version: '3'
+services:
+
+  backend:
+    build:
+      context: ../../
+      dockerfile: tracks/track3/backend/Dockerfile
+    ports:
+      - "80:8080"
+    networks:
+      default:
+        ipv4_address: 192.168.33.10
+    depends_on:
+      - "database"
+
+  database:
+    build: database
+    ports:
+      - "8082:8082"
+      - "9092:9092"
+    volumes:
+      - ./data:/usr/src/data
+    networks:
+      default:
+        ipv4_address: 192.168.33.11
+
+  frontend:
+    build:
+      context: ../../
+      dockerfile: tracks/track3/frontend/Dockerfile
+    ports:
+      - "8081:80"
+    networks:
+      default:
+        ipv4_address: 192.168.33.12
+    depends_on:
+      - "backend"
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.33.0/24

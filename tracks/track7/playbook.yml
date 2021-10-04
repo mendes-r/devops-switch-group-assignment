@@ -1,0 +1,52 @@
+---
+- hosts: db
+  become: yes
+  tasks: 
+    - name: update apt cache
+      apt: update_cache=yes 
+    - name: install jdk
+      apt: name=openjdk-8-jdk-headless state=present   
+    - name: create a directory if it does not exist
+      ansible.builtin.file:
+        path: /usr/src/app
+        state: directory
+    - name: remove h2 jar files
+      ansible.builtin.file:
+        path: /usr/src/app/*.jar*
+        state: absent    
+    - name: download h2 jar
+      get_url:
+        url: https://repo1.maven.org/maven2/com/h2database/h2/1.4.200/h2-1.4.200.jar
+        dest: /usr/src/app
+    - name: kill h2 process
+      shell: pkill -9 java 
+      ignore_errors: yes   
+    - name: start h2 server
+      shell: nohup java -cp /usr/src/app/h2*.jar org.h2.tools.Server -web -webAllowOthers -tcp -tcpAllowOthers -ifNotExists </dev/null >/dev/null 2>&1 &
+- hosts: backend
+  become: yes
+  tasks:
+    - name: update apt cache
+      apt: update_cache=yes
+    - name: install jdk
+      apt: name=openjdk-8-jdk-headless state=present
+    - name: copy the jar file to server
+      copy: src=../../target/project-1.0-SNAPSHOT.jar dest=/root/ 
+    - name: copy the application properties file to server
+      copy: src=../../src/main/resources/application-production-cloud.properties  dest=/root/
+    - name: kill backend process
+      shell: pkill -9 java 
+      ignore_errors: yes   
+    - name: start backend server
+      shell: nohup java -jar /root/project-1.0-SNAPSHOT.jar --spring.config.location=file:///root/application-production-cloud.properties </dev/null >/dev/null 2>&1 &
+- hosts: frontend
+  become: yes
+  tasks:
+    - name: update apt cache
+      apt: update_cache=yes
+    - name: clean frontend folder in server
+      ansible.builtin.file:
+        path: /var/www/html/*
+        state: absent
+    - name: copy frontend build folder to server
+      copy: src=../../frontend/build/  dest=/var/www/html/

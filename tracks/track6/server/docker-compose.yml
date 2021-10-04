@@ -1,0 +1,40 @@
+version: '3'
+services:
+
+  backend:
+    image: 1201771/devops_2021_1201771:backend_14
+    ports:
+      - "80:8080"
+    networks:
+      default:
+        ipv4_address: 192.168.33.10
+    depends_on:
+      - "database"
+
+  database:
+    image: 1201771/devops_2021_1201771:database_14
+    ports:
+      - "8082:8082"
+      - "9092:9092"
+    volumes:
+      - ./data:/usr/src/data
+    networks:
+      default:
+        ipv4_address: 192.168.33.11
+
+  frontend:
+    image: 1201771/devops_2021_1201771:frontend_14
+    ports:
+      - "8081:80"
+    networks:
+      default:
+        ipv4_address: 192.168.33.12
+    depends_on:
+      - "backend"
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.33.0/24

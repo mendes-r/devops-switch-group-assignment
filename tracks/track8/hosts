@@ -1,0 +1,4 @@
+[devopsservers]
+db ansible_ssh_host=vs387.dei.isep.ipp.pt ansible_ssh_port=22 ansible_ssh_user=root ansible_ssh_pass=CtH65bx5WQLF
+backend ansible_ssh_host=vs430.dei.isep.ipp.pt ansible_ssh_port=22 ansible_ssh_user=root ansible_ssh_pass=Z5E0G+1YPVoY
+frontend ansible_ssh_host=vs431.dei.isep.ipp.pt ansible_ssh_port=22 ansible_ssh_user=root ansible_ssh_pass=oOiJP02CRwt9

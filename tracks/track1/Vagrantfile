@@ -1,0 +1,125 @@
+# See: https://manski.net/2016/09/vagrant-multi-machine-tutorial/
+# for information about machine names on private network
+Vagrant.configure("2") do |config|
+  config.vm.box = "envimation/ubuntu-xenial"
+
+  # This provision is common for both VMs
+  config.vm.provision "shell", inline: <<-SHELL
+    sudo apt-get update -y
+    sudo apt-get install iputils-ping -y
+    sudo apt-get install -y avahi-daemon libnss-mdns
+    sudo apt-get install -y unzip
+    sudo apt-get install openjdk-8-jdk-headless -y
+    sudo apt-get install python3 --yes
+    # ifconfig
+  SHELL
+
+  #============
+  # Configurations specific to the database VM
+  config.vm.define "db" do |db|
+    db.vm.box = "envimation/ubuntu-xenial"
+    db.vm.hostname = "db"
+    db.vm.network "private_network", ip: "192.168.33.11"
+
+    # We want to access H2 console from the host using port 8082
+    # We want to connet to the H2 server using port 9092
+    db.vm.network "forwarded_port", guest: 8082, host: 8082
+    db.vm.network "forwarded_port", guest: 9092, host: 9092
+
+    # We need to download H2
+    db.vm.provision "shell", inline: <<-SHELL
+      wget https://repo1.maven.org/maven2/com/h2database/h2/1.4.200/h2-1.4.200.jar
+    SHELL
+
+    # The following provision shell will run ALWAYS so that we can execute the H2 server process
+    # This could be done in a different way, for instance, setiing H2 as as service, like in the following link:
+    # How to setup java as a service in ubuntu: http://www.jcgonzalez.com/ubuntu-16-java-service-wrapper-example
+    #
+    # To connect to H2 use: jdbc:h2:tcp://192.168.33.11:9092/./jpadb
+    db.vm.provision "shell", :run => 'always', inline: <<-SHELL
+      java -cp ./h2*.jar org.h2.tools.Server -web -webAllowOthers -tcp -tcpAllowOthers -ifNotExists > ~/out.txt &
+    SHELL
+  end
+
+  #============
+  # Configurations specific to the backend server VM
+  config.vm.define "be" do |be|
+    be.vm.box = "envimation/ubuntu-xenial"
+    be.vm.hostname = "be"
+    be.vm.network "private_network", ip: "192.168.33.10"
+
+    # We set more ram memmory for this VM
+    be.vm.provider "virtualbox" do |v|
+      v.memory = 1024
+    end
+
+    # We want to access tomcat from the host using port .8080
+    be.vm.network "forwarded_port", guest: 8080, host: 8080
+
+    be.vm.provision "shell", inline: <<-SHELL, privileged: false
+      sudo apt install tomcat8 -y
+      sudo apt install tomcat8-admin -y
+      # If you want to access Tomcat admin web page do the following:
+      # Edit /etc/tomcat8/tomcat-users.xml
+      # uncomment tomcat-users and add manager-gui to tomcat user
+    SHELL
+
+  end
+
+
+   #============
+  # Configurations specific to the frontend server VM
+  config.vm.define "fe" do |fe|
+    fe.vm.box = "envimation/ubuntu-xenial"
+    fe.vm.hostname = "fe"
+    fe.vm.network "private_network", ip: "192.168.33.12"
+
+    # We set more ram memmory for this VM
+    fe.vm.provider "virtualbox" do |v|
+      v.memory = 1024
+    end
+
+    # We want to access tomcat from the host using port 80
+    fe.vm.network "forwarded_port", guest: 80, host: 80
+
+    fe.vm.provision "shell", inline: <<-SHELL, privileged: false
+      sudo apt-get install nodejs -y
+      sudo apt-get install npm -y
+      sudo ln -s /usr/bin/nodejs /usr/bin/node
+      sudo apt-get install apache2 -y
+    SHELL
+
+  end
+
+    #============
+  # Configurations specific to the jenkins server VM
+   config.vm.define "ansible" do |ansible|
+    ansible.vm.box = "envimation/ubuntu-xenial"
+    config.vm.provider "virtualbox" do |v|
+      v.memory = 2048
+    end
+    ansible.vm.hostname = "ansible"
+    ansible.vm.network "private_network", ip: "192.168.33.13"
+
+    # For some Windows and for running ansible "inside" jenkins
+    # ansible.vm.synced_folder ".", "/vagrant", mount_options: ["dmode=777,fmode=777"]
+    # It seems that ansible has security issues with the previous command. Use instead:
+    ansible.vm.synced_folder ".", "/vagrant", mount_options: ["dmode=775,fmode=600"]
+
+    # For acessing jenkins in 8081
+    ansible.vm.network "forwarded_port", guest: 8080, host: 8081
+
+    ansible.vm.provision "shell", inline: <<-SHELL
+      sudo apt-get install -y --no-install-recommends apt-utils
+      sudo apt-get install software-properties-common --yes
+      sudo apt-add-repository --yes --u ppa:ansible/ansible
+      sudo apt-get install git-all --yes
+      sudo apt-get install nodejs --yes
+      sudo apt-get install ansible --yes
+      # For jenkins
+      sudo wget http://mirrors.jenkins.io/war-stable/latest/jenkins.war
+      sudo java -jar jenkins.war
+    SHELL
+  end
+
+end

@@ -1,0 +1,89 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out...'
+                git credentialsId: 'devops-bitbucket-credenciais', url: 'https://BVSousa90@bitbucket.org/BVSousa90/devops_g2.git'
+            }
+        }
+        stage('Assemble Backend') {
+            steps {
+                echo 'Assembling...'
+                script {
+                    if (isUnix())
+                        sh './mvnw package -Dmaven.test.skip=true'
+                    else
+                       bat './mvnw package -Dmaven.test.skip=true'
+                }
+            }
+        }
+        stage('Assemble Frontend') {
+            steps {
+                echo 'Assembling...'
+                dir("frontend/"){
+                    script{
+                        sh 'npm install; REACT_APP_URL_API=vs464.dei.isep.ipp.pt:80 CI=false npm run build'
+                    }
+                }
+            }
+        }
+        stage('Javadoc') {
+                   steps {
+                           echo 'Generating javadoc report...'
+                           script {
+                            if (isUnix())
+                               sh './mvnw javadoc:javadoc'
+                            else
+                              bat './mvnw javadoc:javadoc'
+                       publishHTML (target : [allowMissing: false,
+                                    alwaysLinkToLastBuild: true,
+                                    keepAll: true,
+                                    reportDir: 'target/site/apidocs/',
+                                    reportFiles: 'index.html',
+                                    reportName: 'JavaDoc Report',
+                                    reportTitles: 'The Report'])
+                       }
+                   }
+        }
+        stage('Test') {
+            steps {
+                    echo 'Testing...'
+                    script {
+                     if (isUnix())
+                        sh './mvnw test'
+                     else
+                       bat './mvnw test'
+                    }
+                    junit 'target/surefire-reports/*.xml'
+                    jacoco(execPattern: 'target/jacoco.exec')
+                }
+        }
+        stage('Building and pushing images'){
+            steps{
+                echo 'Building and pushing Image...'
+                dir('tracks/track5'){
+                    script{
+                        sh 'docker-compose build --no-cache'
+                        sh 'docker-compose up -d'
+                        docker.withRegistry('', '1201761'){
+                           sh "docker tag track5_frontend 1201761/devops2021:frontend_${env.BUILD_NUMBER}"
+                           sh "docker tag track5_backend 1201761/devops2021:backend_${env.BUILD_NUMBER}"
+                           sh "docker tag track5_database 1201761/devops2021:database_${env.BUILD_NUMBER}"
+                           sh "docker push 1201761/devops2021:frontend_${env.BUILD_NUMBER}"
+                           sh "docker push 1201761/devops2021:backend_${env.BUILD_NUMBER}"
+                           sh "docker push 1201761/devops2021:database_${env.BUILD_NUMBER}"
+                        }
+                    }
+                }
+            }
+        }
+        stage('Archive') {
+            steps {
+                echo 'Archiving...'
+                archiveArtifacts 'target/*.jar'
+            }
+        }
+    }
+}

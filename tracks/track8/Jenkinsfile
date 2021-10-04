@@ -1,0 +1,77 @@
+pipeline {
+    agent any
+    
+    tools {nodejs "node"}
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out...'
+                git credentialsId: 'devops-repo-credentials', url: 'https://mendes-r@bitbucket.org/BVSousa90/devops_g2.git'
+            }
+        }
+        stage('Assemble Backend') {
+            steps {
+                echo 'Assembling Backend...'
+                script {
+                    if (isUnix())
+                        sh './gradlew clean bootJar'
+                    else
+                       bat './gradlew clean bootJar'
+                }
+            }    
+        }
+        stage('Assemble Frontend') {
+            steps {
+                echo 'Assembling Frontend...'
+                dir("frontend/"){
+                    script{
+                        sh 'rm -rf node_modules; npm install; REACT_APP_URL_API=http://vs430.dei.isep.ipp.pt:8080 CI=false npm run build'
+                }
+            }
+        }    
+        stage('Javadoc') {
+            steps {
+                echo 'Generating javadoc report...'
+                script {
+                    if (isUnix())
+                        sh './gradlew javadoc'
+                    else
+                        bat '/gradlew javadoc'
+                publishHTML (target : [allowMissing: false,
+                             alwaysLinkToLastBuild: true,
+                             keepAll: true,
+                             reportDir: 'build/docs/javadoc/',
+                             reportFiles: 'index.html',
+                             reportName: 'JavaDoc Report',
+                             reportTitles: 'The Report'])    
+                }
+            }      
+        }
+        stage('Test') {
+            steps {
+                    echo 'Testing...'
+                    script {
+                        if (isUnix())
+                            sh './gradlew test'
+                        else
+                            bat './gradlew test'
+                    }
+                    junit 'build/test-results/**/*.xml'
+                    jacoco(execPattern: 'build/jacoco/test.exec')
+                }
+        }
+        stage('Archive') {
+            steps {
+                echo 'Archiving...'
+                archiveArtifacts 'build/libs/*.jar'
+            }
+        }
+        stage('Deploy') {
+            steps {
+                echo 'Deploying...'
+                ansiblePlaybook(inventory: 'tracks/track8/hosts', playbook: 'tracks/track8/playbook.yml')
+            }
+        }
+    }
+}

@@ -1,0 +1,48 @@
+package switchtwentytwenty.project.dto.indto;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class InPersonalCashAccountDTOTest {
+
+    @Test
+    void getPersonID() {
+        //arrange
+        String personID = "ola@hotmail.com";
+        double initialAmount = 10;
+        String designation = "crypto";
+        InPersonalCashAccountDTO dto = new InPersonalCashAccountDTO(personID, initialAmount, designation);
+        //act
+        String result = dto.getPersonID();
+        //assert
+        assertEquals(personID, result);
+    }
+
+    @Test
+    void getInitialAmount() {
+        //arrange
+        String personID = "ola@hotmail.com";
+        double initialAmount = 10;
+        String designation = "crypto";
+        InPersonalCashAccountDTO dto = new InPersonalCashAccountDTO(personID, initialAmount, designation);
+        //act
+        double result = dto.getInitialAmount();
+        //assert
+        assertEquals(initialAmount, result);
+    }
+
+    @Test
+    void getDesignation() {
+        //arrange
+        String personID = "ola@hotmail.com";
+        double initialAmount = 10;
+        String designation = "crypto";
+        InPersonalCashAccountDTO dto = new InPersonalCashAccountDTO(personID, initialAmount, designation);
+        //act
+        String result = dto.getDesignation();
+        //assert
+        assertEquals(designation, result);
+    }
+
+}

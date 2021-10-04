@@ -1,0 +1,122 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out...'
+                git credentialsId: 'devops_tomas_credentials', url: 'https://TomasFurtado@bitbucket.org/BVSousa90/devops_g2.git'
+            }
+        }
+        stage('Assemble Backend') {
+            steps {
+                echo 'Assembling...'
+                    script {
+                        if (isUnix()) {
+                             echo 'gradle clean'
+                             sh './gradlew clean'
+                             echo 'gradle bootJar'
+                             sh './gradlew clean bootJar'
+                        }
+                        else {
+                            echo 'gradle clean'
+                            bat './gradlew clean'
+                            echo 'gradle bootJar'
+                            bat './gradlew clean bootJar'
+                        }
+                    }
+            }
+        }
+        stage('Assemble Frontend') {
+            steps {
+                echo 'Assembling...'
+                dir("frontend/"){
+                  script{
+                    sh 'npm install; REACT_APP_URL_API=http://localhost:80 CI=false npm run build'
+                   }
+                }
+            }
+        }
+        stage('Javadoc') {
+                   steps {
+                       echo 'Generating javadoc report...'
+                          script {
+                           if (isUnix())
+                              sh './gradlew javadoc'
+                           else
+                             bat './gradlew javadoc'
+
+                       publishHTML (target : [allowMissing: false,
+                                    alwaysLinkToLastBuild: true,
+                                    keepAll: true,
+                                    reportDir: 'build/docs/javadoc/',
+                                    reportFiles: 'index.html',
+                                    reportName: 'JavaDoc Report',
+                                    reportTitles: 'The Report'])
+                       }
+                   }
+        }
+        stage('Test') {
+            steps {
+                    echo 'Testing...'
+                    script {
+                     if (isUnix())
+                        sh './gradlew test'
+                     else
+                       bat './gradlew test'
+                    }
+                    junit 'build/test-results/test/*.xml'
+                    jacoco(execPattern: 'build/jacoco/test.exec')
+                }
+        }
+        stage('Docker Image'){
+            steps{
+                echo 'Building and pushing Image...'
+                dir('tracks/track4'){
+                 script {
+                    if (isUnix()) {
+                        sh 'docker-compose build --no-cache'
+                        sh 'docker-compose up -d'
+                        echo "build number: ${env.BUILD_NUMBER}"
+                        docker.withRegistry('','devops_docker_credentials'){
+                            echo 'Pushing front-end image...'
+                            sh "docker tag track4_frontend tomasfurtado/devops_1201783:frontend_image_${env.BUILD_NUMBER}"
+                            sh "docker push tomasfurtado/devops_1201783:frontend_image_${env.BUILD_NUMBER}"
+                            echo 'Pushing back-end image...'
+                            sh "docker tag track4_backend tomasfurtado/devops_1201783:backend_image_${env.BUILD_NUMBER}"
+                            sh "docker push tomasfurtado/devops_1201783:backend_image_${env.BUILD_NUMBER}"
+                            echo 'Pushing database image...'
+                            sh "docker tag track4_database tomasfurtado/devops_1201783:database_image_${env.BUILD_NUMBER}"
+                            sh "docker push tomasfurtado/devops_1201783:database_image_${env.BUILD_NUMBER}"
+                        }
+                    }
+                    else {
+                        echo 'docker-compose build'
+                        bat 'docker-compose build --no-cache'
+                        echo 'docker-compose up'
+                        bat 'docker-compose up -d'
+                        echo "build number: ${env.BUILD_NUMBER}"
+                        docker.withRegistry('','devops_docker_jenkins'){
+                            echo 'Pushing front-end image...'
+                            bat "docker tag track4_frontend tomasfurtado/devops_1201783:frontend_image_${env.BUILD_NUMBER}"
+                            bat "docker push tomasfurtado/devops_1201783:frontend_image_${env.BUILD_NUMBER}"
+                            echo 'Pushing back-end image...'
+                            bat "docker tag track4_backend tomasfurtado/devops_1201783:backend_image_${env.BUILD_NUMBER}"
+                            bat "docker push tomasfurtado/devops_1201783:backend_image_${env.BUILD_NUMBER}"
+                            echo 'Pushing database image...'
+                            bat "docker tag track4_database tomasfurtado/devops_1201783:database_image_${env.BUILD_NUMBER}"
+                            bat "docker push tomasfurtado/devops_1201783:database_image_${env.BUILD_NUMBER}"
+                        }
+                    }
+                 }
+               }
+            }
+        }
+        stage('Archive') {
+            steps {
+                echo 'Archiving...'
+                archiveArtifacts 'build/libs/*.jar'
+            }
+        }
+    }
+}
